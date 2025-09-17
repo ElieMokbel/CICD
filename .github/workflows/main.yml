@@ -1,36 +1,52 @@
+name: Dev Branch CI
+
 on:
   push:
     branches:
-      - main
-  pull_request:
- 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Print build step
-        run: |
-          echo "Building project..."
-          sleep 5
-          echo "Build complete."
- 
-  test:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Print test step
-        run: |
-          echo "Running tests..."
-          sleep 5
-          echo "Tests complete."
- 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Print deploy step
-        run: |
-          echo "Deploying application..."
-          sleep 5
-          echo "Deploy complete."
+      - dev
 
+jobs:
+  # Stage: unit tests
+  unit-test-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Run Python unit tests
+        run: python3 -m unittest discover -s tests -p "*.py"
+
+  # Stage: Merge Request (Pull Request)
+  create-merge-request:
+    runs-on: ubuntu-latest
+    needs: unit-test-job               # Only runs if unit tests pass
+    if: github.ref == 'refs/heads/dev'  # Only on dev branch
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Option 1: Use official Action (simplest)
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.API_TOKEN }}  # GitHub secret
+          branch: dev                       # Source branch
+          base: main                        # Target branch
+          title: "Auto merge dev to main"
+          body: "This pull request is created automatically from the dev branch."
+
+      # Option 2: Use GitHub API with curl (similar to GitLab curl)
+      # - name: Create Pull Request via curl
+      #   env:
+      #     GH_TOKEN: ${{ secrets.API_TOKEN }}
+      #   run: |
+      #     curl -X POST \
+      #       -H "Authorization: token $GH_TOKEN" \
+      #       -H "Accept: application/vnd.github+json" \
+      #       https://api.github.com/repos/<owner>/<repo>/pulls \
+      #       -d '{"title":"Auto merge dev to main","head":"dev","base":"main","body":"Created automatically by workflow"}'
